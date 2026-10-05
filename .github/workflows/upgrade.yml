@@ -10,14 +10,14 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write
 
 concurrency: upgrade-contracts
 
 jobs:
   # Opens a pull request that moves the pins to the latest release of the contracts.
   # Opening it needs the repository setting "Allow GitHub Actions to create and approve
-  # pull requests"; without it the branch is pushed and the last step fails.
+  # pull requests"; without it the branch is pushed and the last step fails. GitHub holds
+  # the checks of that pull request until someone with write access approves them.
   upgrade:
     runs-on: ubuntu-latest
     env:
@@ -65,10 +65,6 @@ jobs:
           git checkout --quiet -b "${BRANCH}"
           git commit --quiet --all --message "Move to contracts ${RELEASE}"
           git push --quiet origin "${BRANCH}"
-          # A branch pushed with this workflow's token starts no workflow, so start the
-          # required checks of its commit here.
-          gh workflow run "Lean Action CI" --ref "${BRANCH}"
-          gh workflow run "Contracts" --ref "${BRANCH}"
 
       - name: Open the pull request
         if: steps.branch.outputs.new == 'true'
