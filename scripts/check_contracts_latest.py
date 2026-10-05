@@ -13,13 +13,15 @@ import tomllib
 TAG = re.compile(r"refs/tags/(v(\d+)\.(\d+)\.(\d+))$")
 
 
-def main() -> None:
+def requirement(name: str) -> dict:
     lakefile = tomllib.loads(pathlib.Path("lakefile.toml").read_text(encoding="utf-8"))
-    contracts = [dep for dep in lakefile.get("require", []) if dep["name"] == "contracts"]
-    if not contracts:
-        sys.exit("lakefile.toml does not require contracts")
-    url, pinned = contracts[0]["git"], contracts[0].get("rev")
+    found = [dep for dep in lakefile.get("require", []) if dep["name"] == name]
+    if not found:
+        sys.exit(f"lakefile.toml does not require {name}")
+    return found[0]
 
+
+def latest_release(url: str) -> str:
     listing = subprocess.run(
         ("git", "ls-remote", "--tags", "--refs", url), check=True, capture_output=True, text=True
     ).stdout
@@ -29,12 +31,16 @@ def main() -> None:
             releases[found[1]] = tuple(int(part) for part in found.groups()[1:])
     if not releases:
         sys.exit(f"{url} has no release tag")
-    latest = max(releases, key=releases.__getitem__)
+    return max(releases, key=releases.__getitem__)
 
+
+def main() -> None:
+    contracts = requirement("contracts")
+    pinned, latest = contracts.get("rev"), latest_release(contracts["git"])
     if pinned != latest:
         sys.exit(
             f"contracts are pinned at {pinned}; their latest release is {latest}\n"
-            f'set `rev = "{latest}"` in lakefile.toml and run `lake update contracts`'
+            "run `python3 scripts/upgrade_contracts.py` and `lake update contracts mathlib`"
         )
     print(f"contracts are pinned at their latest release, {latest}")
 
