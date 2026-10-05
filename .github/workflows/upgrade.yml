@@ -1,0 +1,81 @@
+name: Upgrade contracts
+
+on:
+  repository_dispatch:
+    types: [contracts-released] # sent by the Release workflow of the contracts, when it can
+  schedule:
+    - cron: "23 * * * *" # hourly, for when it cannot
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency: upgrade-contracts
+
+jobs:
+  # Opens a pull request that moves the pins to the latest release of the contracts.
+  # Opening it needs the repository setting "Allow GitHub Actions to create and approve
+  # pull requests"; without it the branch is pushed and the last step fails.
+  upgrade:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Move the pins to the latest release
+        id: pins
+        run: python3 scripts/upgrade_contracts.py
+
+      - name: Skip a release that has its branch already
+        id: branch
+        if: steps.pins.outputs.release != ''
+        env:
+          BRANCH: contracts-${{ steps.pins.outputs.release }}
+        run: |
+          echo "name=${BRANCH}" >> "${GITHUB_OUTPUT}"
+          if [ -n "$(git ls-remote --heads origin "${BRANCH}")" ]; then
+            echo "${BRANCH} exists already"
+          else
+            echo "new=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install Lean
+        if: steps.branch.outputs.new == 'true'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "${HOME}/.elan/bin" >> "${GITHUB_PATH}"
+
+      - name: Resolve the pins
+        if: steps.branch.outputs.new == 'true'
+        env:
+          MATHLIB_NO_CACHE_ON_UPDATE: "1" # the manifest is all this needs, not Mathlib's build
+        run: lake update contracts mathlib
+
+      - name: Push the branch
+        if: steps.branch.outputs.new == 'true'
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+          RELEASE: ${{ steps.pins.outputs.release }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --quiet -b "${BRANCH}"
+          git commit --quiet --all --message "Move to contracts ${RELEASE}"
+          git push --quiet origin "${BRANCH}"
+          # A branch pushed with this workflow's token starts no workflow, so start the
+          # required checks of its commit here.
+          gh workflow run "Lean Action CI" --ref "${BRANCH}"
+          gh workflow run "Contracts" --ref "${BRANCH}"
+
+      - name: Open the pull request
+        if: steps.branch.outputs.new == 'true'
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+          RELEASE: ${{ steps.pins.outputs.release }}
+        run: |
+          gh pr create --base main --head "${BRANCH}" \
+            --title "Move to contracts ${RELEASE}" \
+            --body "Moves the pins to the release ${RELEASE} of the contracts. Opened by the Upgrade contracts workflow."
