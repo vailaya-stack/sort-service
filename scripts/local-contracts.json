@@ -1,0 +1,10 @@
+{"version": "1.2.0",
+ "packages": [
+  {"name": "contracts",
+   "type": "path",
+   "dir": "../contracts",
+   "scope": "",
+   "inherited": false,
+   "configFile": "lakefile.toml",
+   "manifestFile": "lake-manifest.json"}
+ ]}

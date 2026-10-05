@@ -1,0 +1,22 @@
+name: Contracts
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * *" # daily: a release of the contracts changes the answer with no push here
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The service must build against the latest release of the contracts.
+  latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - run: python3 scripts/check_contracts_latest.py
