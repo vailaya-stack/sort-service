@@ -17,8 +17,9 @@ rev = "v4.34.1"
 [[require]]
 name = "contracts"
 git = "https://github.com/vailaya-stack/contracts"
-rev = "v0.2.1"
+rev = "v0.2.2"
 
 [[lean_lib]]
 name = "SortService"
 srcDir = "src"
+globs = ["SortService.*"] # every file under src/SortService/, imported by the root or not
