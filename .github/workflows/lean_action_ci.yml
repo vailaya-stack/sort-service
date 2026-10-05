@@ -2,14 +2,12 @@ name: Lean Action CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read # Read access to repository contents
-  pages: write # Write access to GitHub Pages
-  id-token: write # Write access to ID tokens
+  contents: read
 
 jobs:
   build:
@@ -22,5 +20,3 @@ jobs:
 
       # Lake only warns when lakefile.toml and the manifest disagree on a pin.
       - run: python3 scripts/check_pins.py
-
-      - uses: leanprover-community/docgen-action@v1
