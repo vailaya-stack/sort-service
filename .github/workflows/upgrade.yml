@@ -2,28 +2,33 @@ name: Upgrade contracts
 
 on:
   repository_dispatch:
-    types: [contracts-released] # sent by the Release workflow of the contracts, when it can
+    types: [contracts-released] # sent by the Release workflow of the contracts
   schedule:
-    - cron: "23 * * * *" # hourly, for when it cannot
+    - cron: "23 * * * *" # hourly, in case that was missed
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency: upgrade-contracts
 
 jobs:
   # Opens a pull request that moves the pins to the latest release of the contracts.
-  # Opening it needs the repository setting "Allow GitHub Actions to create and approve
-  # pull requests"; without it the branch is pushed and the last step fails. GitHub holds
-  # the checks of that pull request until someone with write access approves them.
+  # The branch and the pull request are made as the org's app, vailaya-stack-app, so their
+  # checks run as for any push.
   upgrade:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Get the app's token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
       - uses: actions/checkout@v5
+        with:
+          token: ${{ steps.app.outputs.token }}
 
       - name: Move the pins to the latest release
         id: pins
@@ -54,24 +59,20 @@ jobs:
           MATHLIB_NO_CACHE_ON_UPDATE: "1" # the manifest is all this needs, not Mathlib's build
         run: lake update contracts mathlib
 
-      - name: Push the branch
+      - name: Push the branch and open the pull request
         if: steps.branch.outputs.new == 'true'
         env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP: ${{ steps.app.outputs.app-slug }}
           BRANCH: ${{ steps.branch.outputs.name }}
           RELEASE: ${{ steps.pins.outputs.release }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          id="$(gh api "/users/${APP}%5Bbot%5D" --jq .id)"
+          git config user.name "${APP}[bot]"
+          git config user.email "${id}+${APP}[bot]@users.noreply.github.com"
           git checkout --quiet -b "${BRANCH}"
           git commit --quiet --all --message "Move to contracts ${RELEASE}"
           git push --quiet origin "${BRANCH}"
-
-      - name: Open the pull request
-        if: steps.branch.outputs.new == 'true'
-        env:
-          BRANCH: ${{ steps.branch.outputs.name }}
-          RELEASE: ${{ steps.pins.outputs.release }}
-        run: |
           gh pr create --base main --head "${BRANCH}" \
             --title "Move to contracts ${RELEASE}" \
             --body "Moves the pins to the release ${RELEASE} of the contracts. Opened by the Upgrade contracts workflow."
