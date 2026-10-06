@@ -66,6 +66,6 @@ commit in `lake-manifest.json`.
   and daily, so a pull request here goes red when the contracts release until the pin moves.
 - A release is tied to a Lean toolchain and a Mathlib revision, so `lean-toolchain` and the
   `mathlib` pin move with it. CI refuses pins that disagree.
-- The `Upgrade contracts` workflow checks hourly, moves the pins and pushes a branch
-  `contracts-v<version>`. It opens the pull request too when the repository setting "Allow
-  GitHub Actions to create and approve pull requests" is on.
+- When the contracts release, the `Upgrade contracts` workflow moves the pins, pushes a
+  branch `contracts-v<version>` and opens its pull request, as the org's GitHub App
+  `vailaya-stack-app`. It also checks hourly, in case it missed a release.
